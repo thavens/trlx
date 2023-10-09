@@ -79,7 +79,7 @@ class PPOConfig(MethodConfig):
     :param ppo_epochs: Number of updates per batch
     :type ppo_epochs: int
 
-    :param num_rollouts: Number  of experiences to observe before learning
+    :param num_rollouts: Number of experiences to observe before learning
     :type num_rollouts: int
 
     :param init_kl_coef: Initial value for KL coefficient

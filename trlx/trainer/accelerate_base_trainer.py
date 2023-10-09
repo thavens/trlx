@@ -4,6 +4,7 @@ import os
 import sys
 from abc import abstractmethod
 from contextlib import contextmanager
+from functools import reduce
 from time import time
 from typing import Dict, List, Optional, Tuple
 
@@ -43,7 +44,7 @@ class AccelerateRLTrainer(BaseRLTrainer):
     RL model trainer with an `accelerate` based backend
     """
 
-    def __init__(self, config, **kwargs):  # noqa: C901
+    def __init__(self, config: TRLConfig, **kwargs):  # noqa: C901
         super().__init__(config, **kwargs)
         self.max_length = config.train.seq_length
         if config.train.minibatch_size:
@@ -140,6 +141,9 @@ class AccelerateRLTrainer(BaseRLTrainer):
                     self.generate_kwargs[k] = v[0]
                 else:
                     self.generate_sweep_kwarg = (k, v)
+        
+        self._eval_callbacks = config.train.eval_callbacks
+
 
     def setup_model(self):
         """
@@ -493,7 +497,16 @@ class AccelerateRLTrainer(BaseRLTrainer):
 
                 stats["samples"] = wandb.Table(columns, rows)
 
+        # Call each callback and the merge the dictionaries together.
+        # Will overwrite stats the intersect.
+        callback_stats = [callback(self.model) for callback in self._eval_callbacks]
+        stats = stats | reduce(
+            lambda x, y: (x if x else {}) | (y if y else {}),
+            callback_stats
+        )
+
         self.nth_evaluation += 1
+
         return stats
 
     @contextmanager

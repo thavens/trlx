@@ -1,10 +1,12 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Callable
 
 import yaml
 
 from trlx.data.method_configs import MethodConfig, get_method
+
+from transformers import PreTrainedModel
 
 
 def merge(base: Dict, update: Dict, updated: Set) -> Dict:
@@ -69,6 +71,14 @@ class ModelConfig:
     @classmethod
     def from_dict(cls, config: Dict[str, Any]):
         return cls(**config)
+
+    def to_dict(self) -> Dict[str, Any]:
+        if isinstance(self.model_path, PreTrainedModel):
+            d = {i: j for i, j in self.__dict__.items() if i != 'model_path'}
+            d['model_path'] = self.model_path.__repr__()
+        else:
+            d = self.__dict__
+        return d
 
 
 @dataclass
@@ -194,8 +204,13 @@ class TrainConfig:
     :param seed: Random seed
     :type seed: int
 
-    :param minibatch_size: Size of model input during one forward pass. Must divide batch size
+    :param minibatch_size: Size of model input during one forward pass. Must divide batch size.
+                           The number of grad accumulation steps equals batch_size / minibatch_size
     :type minibatch_size: int
+
+    :param eval_callbacks: List of functions Callable(model) for custom model evaluation scipts. 
+                           Return value logged as string.
+    :type eval_callbacks: List[Callable]
     """
 
     total_steps: int
@@ -227,6 +242,8 @@ class TrainConfig:
     seed: int = 1000
 
     minibatch_size: Optional[int] = None
+
+    eval_callbacks: Optional[List[Callable]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, config: Dict[str, Any]):
@@ -264,7 +281,7 @@ class TRLConfig:
         """
         data = {
             "method": self.method.__dict__,
-            "model": self.model.__dict__,
+            "model": self.model.to_dict(),
             "optimizer": self.optimizer.__dict__,
             "scheduler": self.scheduler.__dict__,
             "tokenizer": self.tokenizer.__dict__,
